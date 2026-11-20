@@ -35,12 +35,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nkbe.util.NeoPackageManager
-import nkbe.util.NeoPackageManager.AppInfo
 import nkbe.util.ShizukuApi
 import top.nkbe.npatch.R
+import top.nkbe.npatch.install.ApkInstallSet
 import top.nkbe.npatch.lspApp
 import top.nkbe.npatch.ui.component.ShimmerAnimation
 import top.nkbe.npatch.ui.page.Navigator
@@ -266,13 +267,11 @@ fun DoPatchBody(modifier: Modifier, navigator: Navigator) {
                 }
                 when (installation) {
                     NewPatchViewModel.InstallMethod.SYSTEM -> InstallDialog(
-                        patchApp = viewModel.patchApp,
                         method = NeoPackageManager.InstallMethod.SYSTEM,
                         onFinish = onFinish,
                     )
 
                     NewPatchViewModel.InstallMethod.SHIZUKU -> InstallDialog(
-                        patchApp = viewModel.patchApp,
                         method = NeoPackageManager.InstallMethod.SHIZUKU,
                         onFinish = onFinish,
                     )
@@ -339,6 +338,7 @@ fun DoPatchBody(modifier: Modifier, navigator: Navigator) {
 
 @Composable
 fun UninstallConfirmationDialog(
+    packageName: String,
     show: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
@@ -346,7 +346,7 @@ fun UninstallConfirmationDialog(
 ) {
     OverlayDialog(
         title = stringResource(R.string.uninstall),
-        summary = stringResource(R.string.patch_uninstall_text),
+        summary = stringResource(R.string.patch_uninstall_text) + "\n\n" + packageName,
         show = show,
         onDismissRequest = onDismiss,
         renderInRootScaffold = false,
@@ -370,28 +370,42 @@ fun UninstallConfirmationDialog(
 
 @Composable
 fun InstallDialog(
-    patchApp: AppInfo,
     method: NeoPackageManager.InstallMethod,
     onFinish: (Int, String?) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    var uninstallFirst by remember(method, patchApp.app.packageName) {
+    var preparedInstallSet by remember(method) { mutableStateOf<ApkInstallSet?>(null) }
+    
+    LaunchedEffect(method) {
+        try {
+            preparedInstallSet = NeoPackageManager.preparePatchedInstallSet()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.e(TAG, "Failed to prepare patched APK set", error)
+            onFinish(PackageInstaller.STATUS_FAILURE, error.stackTraceToString())
+        }
+    }
+    
+    val installSet = preparedInstallSet ?: return
+    val packageName = installSet.packageName
+    var uninstallFirst by remember(method, packageName) {
         mutableStateOf(
             if (method == NeoPackageManager.InstallMethod.SHIZUKU) {
-                runCatching { ShizukuApi.isPackageInstalledWithoutPatch(patchApp.app.packageName) }.getOrDefault(false)
+                runCatching { ShizukuApi.isPackageInstalledWithoutPatch(packageName) }.getOrDefault(false)
             } else {
-                checkIsApkFixedByLSP(context, patchApp.app.packageName)
+                checkIsApkFixedByLSP(context, packageName)
             },
         )
     }
     var installing by remember { mutableStateOf(0) }
     var installStarted by remember { mutableStateOf(false) }
     suspend fun doInstall() {
-        Log.i(TAG, "Installing ${patchApp.app.packageName} with $method")
+        Log.i(TAG, "Installing $packageName with $method")
         installStarted = true
         installing = 1
-        val outcome = NeoPackageManager.install(method)
+        val outcome = NeoPackageManager.install(method, installSet)
         installing = 0
         Log.i(TAG, "Installation end: $outcome")
         when (outcome) {
@@ -415,7 +429,7 @@ fun InstallDialog(
             var checkCount = 0
             var stillInstalled = true
             while (checkCount < 10) {
-                if (!checkIsApkFixedByLSP(context, patchApp.app.packageName)) {
+                if (!checkIsApkFixedByLSP(context, packageName)) {
                     stillInstalled = false
                     break
                 }
@@ -424,7 +438,7 @@ fun InstallDialog(
             }
             withContext(kotlinx.coroutines.Dispatchers.Main) {
                 if (stillInstalled) {
-                    onFinish(PackageInstaller.STATUS_FAILURE, "Original application was not uninstalled")
+                    onFinish(PackageInstaller.STATUS_FAILURE, "$packageName was not uninstalled")
                 } else {
                     uninstallFirst = false
                     if (!installStarted) {
@@ -435,13 +449,14 @@ fun InstallDialog(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(installSet, method) {
         if (!uninstallFirst && !installStarted) {
             doInstall()
         }
     }
 
     UninstallConfirmationDialog(
+        packageName = packageName,
         show = uninstallFirst,
         onDismiss = { onFinish(NeoPackageManager.STATUS_USER_CANCELLED, "User cancelled") },
         onIgnoreAndInstall = {
@@ -455,9 +470,9 @@ fun InstallDialog(
         onConfirm = {
             if (method == NeoPackageManager.InstallMethod.SHIZUKU) {
                 scope.launch {
-                    Log.i(TAG, "Uninstalling app ${patchApp.app.packageName}")
+                    Log.i(TAG, "Uninstalling app $packageName")
                     installing = 2
-                    val (status, message) = NeoPackageManager.uninstall(patchApp.app.packageName)
+                    val (status, message) = NeoPackageManager.uninstall(packageName)
                     installing = 0
                     Log.i(TAG, "Uninstallation end: $status, $message")
                     if (status == PackageInstaller.STATUS_SUCCESS) {
@@ -468,7 +483,7 @@ fun InstallDialog(
                     } else {
                         uninstallLauncher.launch(
                             Intent(Intent.ACTION_DELETE).apply {
-                                data = "package:${patchApp.app.packageName}".toUri()
+                                data = "package:$packageName".toUri()
                             },
                         )
                     }
@@ -476,7 +491,7 @@ fun InstallDialog(
             } else {
                 uninstallLauncher.launch(
                     Intent(Intent.ACTION_DELETE).apply {
-                        data = "package:${patchApp.app.packageName}".toUri()
+                        data = "package:$packageName".toUri()
                     },
                 )
             }

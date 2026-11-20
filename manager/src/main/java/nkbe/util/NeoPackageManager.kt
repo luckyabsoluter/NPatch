@@ -288,11 +288,16 @@ object NeoPackageManager {
         }
     }
 
-    suspend fun install(method: InstallMethod): InstallOutcome {
+    internal suspend fun preparePatchedInstallSet(): ApkInstallSet = withContext(Dispatchers.IO) {
+        ApkInstallSet.fromFiles(lspApp, collectInstallApkFiles())
+    }
+    
+    suspend fun install(method: InstallMethod): InstallOutcome =
+        install(method, preparePatchedInstallSet())
+    
+    internal suspend fun install(method: InstallMethod, installSet: ApkInstallSet): InstallOutcome {
         Log.i(TAG, "Installing patched APK set with $method")
         return withContext(Dispatchers.IO) {
-            val installFiles = collectInstallApkFiles()
-            val installSet = ApkInstallSet.fromFiles(lspApp, installFiles)
             val targetPkg = installSet.packageName
             val thirdPartyPkg = top.nkbe.npatch.config.Configs.thirdPartyInstallerPackage
 
