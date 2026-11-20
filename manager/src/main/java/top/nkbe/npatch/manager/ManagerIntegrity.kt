@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Process
 import android.util.Log
 import top.nkbe.npatch.BuildConfig
 import java.security.MessageDigest
@@ -23,9 +22,6 @@ object ManagerIntegrity {
         report.warnings.forEach { Log.w(TAG, it) }
         if (!report.signatureTrusted) {
             Log.e(TAG, "Manager signature verification failed: ${report.signatures.joinToString()}")
-            if (!BuildConfig.DEBUG) {
-                Process.killProcess(Process.myPid())
-            }
         }
     }
 
