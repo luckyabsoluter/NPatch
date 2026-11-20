@@ -45,6 +45,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -95,6 +96,15 @@ public class NPatch {
 
     @Parameter(names = {"-p", "--newpackage"}, description = "Patch with new package")
     private String newPackageName = "";
+    
+    @Parameter(names = "--isolate-permissions", description = "Isolate custom permissions declared by a renamed app")
+    private boolean isolatePermissions;
+    
+    @Parameter(names = "--permission-state-dir", description = "Directory used to preserve permission instance IDs")
+    private File permissionStateDirectory;
+    
+    @Parameter(names = "--previous-apk", description = "Previous patched base APK used to recover a permission mapping")
+    private File previousApk;
 
     @Parameter(names = {"-d", "--debuggable"}, description = "Set app to be debuggable")
     private boolean debuggableFlag = false;
@@ -217,8 +227,10 @@ public class NPatch {
     }
 
     public void doCommandLine() throws PatchError, IOException {
-        for (var apk : apkPaths) {
-            File srcApkFile = new File(apk).getAbsoluteFile();
+        var sourceFiles = new ArrayList<File>();
+        for (String apk : apkPaths) sourceFiles.add(new File(apk).getAbsoluteFile());
+        PermissionIsolation permissions = preparePermissions(sourceFiles);
+        for (File srcApkFile : sourceFiles) {
 
             String apkFileName = srcApkFile.getName();
 
@@ -236,11 +248,28 @@ public class NPatch {
                 throw new PatchError(outputFile.getAbsolutePath() + " exists. Use --force to overwrite");
             logger.i("Processing " + srcApkFile + " -> " + outputFile);
 
-            patch(srcApkFile, outputFile);
+            patch(srcApkFile, outputFile, permissions);
         }
     }
 
     public void patch(File srcApkFile, File outputFile) throws PatchError, IOException {
+        patch(srcApkFile, outputFile, preparePermissions(Collections.singletonList(srcApkFile)));
+    }
+    
+    private PermissionIsolation preparePermissions(List<File> files) throws IOException {
+        if (!isolatePermissions) return null;
+        File directory = permissionStateDirectory != null ? permissionStateDirectory
+                : new File(System.getProperty("user.home"), ".npatch/permissions");
+        PermissionIsolation permissions = PermissionIsolation.prepare(files, newPackageName, directory.toPath(), previousApk);
+        if (permissions != null) {
+            logger.i("Isolating " + permissions.mapping.permissions.size() + " app-declared permissions and "
+                    + permissions.mapping.groups.size() + " permission groups across the APK set");
+            logger.i("External apps using these permissions may need a new integration; native and unsupported runtime permission calls are not translated");
+        }
+        return permissions;
+    }
+    
+    private void patch(File srcApkFile, File outputFile, PermissionIsolation permissions) throws PatchError, IOException {
         if (!srcApkFile.exists())
             throw new PatchError("The source apk file does not exit. Please provide a correct path.");
 
@@ -346,7 +375,8 @@ public class NPatch {
                         ? pair.splitName
                         : srcApkFile.getName();
                 logger.i("Packing split apk: " + splitDisplayName + "...");
-                boolean needModifyManifest = !newPackage.equals(pair.packageName) || overrideVersionCode || overrideTargetSdk || extractNativeLibs;
+                boolean needModifyManifest = permissions != null || !newPackage.equals(pair.packageName)
+                        || overrideVersionCode || overrideTargetSdk || extractNativeLibs;
                 byte[] manifestBytes;
                 if (needModifyManifest) {
                     ModificationProperty splitProperty = new ModificationProperty();
@@ -362,11 +392,12 @@ public class NPatch {
                     if (!newPackage.equals(pair.packageName)) {
                         splitProperty.addManifestAttribute(new AttributeItem(NodeValue.Manifest.PACKAGE, newPackage).setNamespace(null));
                     }
-                    try (var xmlIs = srcZip.getInputStream(manifestEntry);
+                    try (var xmlIs = permissionManifest(srcZip.getInputStream(manifestEntry), permissions, pair.packageName);
                          var os = new ByteArrayOutputStream()) {
                         new ManifestEditor(xmlIs, os, splitProperty).processManifest();
                         manifestBytes = os.toByteArray();
                     } catch (Throwable e) {
+                        if (permissions != null) throw new PatchError("Failed to isolate split manifest permissions", e);
                         logger.e("Failed to modify split manifest: " + e.getMessage() + ", falling back to copy");
                         try (var xmlIs = srcZip.getInputStream(manifestEntry)) {
                             manifestBytes = IOUtils.toByteArray(xmlIs);
@@ -423,11 +454,12 @@ public class NPatch {
                         usesCleartextTraffic,
                         overrideTargetSdk,
                         overrideTargetSdkValue);
+                if (permissions != null) config.permissionMapping = permissions.mapping;
                 final var configBytes = new Gson().toJson(config).getBytes(StandardCharsets.UTF_8);
                 final var metadata = Base64.getEncoder().encodeToString(configBytes);
 
                 byte[] modifiedManifestBytes;
-                try (var xmlIs = srcZip.getInputStream(manifestEntry)) {
+                try (var xmlIs = permissionManifest(srcZip.getInputStream(manifestEntry), permissions, pair.packageName)) {
                     modifiedManifestBytes = modifyManifestFile(xmlIs, metadata, minSdkVersion, pair.packageName, newPackage, originalSignature, entryHookMode);
                 } catch (Throwable e) {
                     throw new PatchError("Error when modifying manifest", e);
@@ -537,6 +569,15 @@ public class NPatch {
         }
 
         logger.i("Done. Output APK: " + outputFile.getAbsolutePath());
+    }
+    
+    private static InputStream permissionManifest(InputStream input, PermissionIsolation permissions,
+                                                  String inputPackage) throws IOException {
+        if (permissions == null) return input;
+        try (input) {
+            return new ByteArrayInputStream(permissions.rewrite(IOUtils.toByteArray(input),
+                    !permissions.mapping.sourcePackage.equals(inputPackage)));
+        }
     }
 
     private void injectLoader(ZipFile srcZip, ZipMaker zipMaker, Set<String> addedEntries) throws IOException {

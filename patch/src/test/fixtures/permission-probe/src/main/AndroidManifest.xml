@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <permission android:name="example.vendor.permission.PRIVATE" android:protectionLevel="signature" />
+    <permission android:name="example.permissionprobe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="example.vendor.permission.PRIVATE" />
+    <uses-permission android:name="example.permissionprobe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:label="NPatch Permission Probe">
+        <activity android:name="example.permissionprobe.PermissionProbeActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

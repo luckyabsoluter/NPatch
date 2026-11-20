@@ -19,6 +19,7 @@ public class PatchConfig {
     public final boolean usesCleartextTraffic;
     public final boolean overrideTargetSdk;
     public final int overrideTargetSdkValue;
+    public PermissionMapping permissionMapping;
 
     public PatchConfig(
             boolean useManager,

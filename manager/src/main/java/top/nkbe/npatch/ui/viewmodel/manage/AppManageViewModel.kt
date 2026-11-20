@@ -191,7 +191,10 @@ class AppManageViewModel : ViewModel() {
                         }
                     }
                 }
-                Patcher.patch(logger, Patcher.Options(appInfo.app.packageName, config, patchPaths, embeddedModulePaths))
+                Patcher.patch(logger, Patcher.Options(
+                    appInfo.app.packageName, config, patchPaths, embeddedModulePaths,
+                    previousPatchedApk = appInfo.app.sourceDir,
+                ))
                 val method = if (ShizukuApi.isReady) {
                     NeoPackageManager.InstallMethod.SHIZUKU
                 } else {

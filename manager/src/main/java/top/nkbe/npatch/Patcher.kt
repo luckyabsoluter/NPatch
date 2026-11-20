@@ -1,5 +1,6 @@
 package top.nkbe.npatch
 
+import android.content.pm.PackageManager
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +32,9 @@ object Patcher {
         val embeddedModulePackages: List<String>? = null,
         private val injectDex: Boolean = false,
         private val labelOverride: String? = null,
-        private val extractNativeLibs: Boolean = false
+        private val extractNativeLibs: Boolean = false,
+        private val isolatePermissions: Boolean = false,
+        private val previousPatchedApk: String? = null,
     ) {
         internal val inputApks: List<File>
             get() = resolveActualApkPaths().map { File(it).absoluteFile }
@@ -89,6 +92,15 @@ object Patcher {
                 }
             }.getOrDefault(emptyList())
         }
+        
+        private fun resolvePreviousPatchedApk(): String? {
+            previousPatchedApk?.let { return it }
+            if (config.newPackage.isBlank() || config.newPackage == targetPackageName) return null
+            return runCatching {
+                val installed = lspApp.packageManager.getApplicationInfo(config.newPackage, PackageManager.GET_META_DATA)
+                installed.sourceDir.takeIf { installed.metaData?.containsKey("npatch") == true }
+            }.getOrNull()
+        }
 
         fun toStringArray(): Array<String> {
             val actualApks = resolveActualApkPaths()
@@ -96,6 +108,15 @@ object Patcher {
             return buildList {
                 add("-o"); add(lspApp.tmpApkDir.absolutePath)
                 add("-p"); add(config.newPackage)
+                if (isolatePermissions || config.permissionMapping != null) {
+                    add("--isolate-permissions")
+                    add("--permission-state-dir")
+                    add(lspApp.filesDir.resolve("permission-instances").absolutePath)
+                    resolvePreviousPatchedApk()?.let {
+                        add("--previous-apk")
+                        add(it)
+                    }
+                }
                 if (config.debuggable) add("-d")
                 add("-l"); add(config.sigBypassLevel.toString())
                 if (config.useManager) add("--manager")

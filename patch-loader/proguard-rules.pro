@@ -9,6 +9,7 @@
 
 # Gson serializes/deserializes these by field name across patcher, manager and loader.
 -keep class top.nkbe.npatch.share.PatchConfig { *; }
+-keep class top.nkbe.npatch.share.PermissionMapping { *; }
 -keep class top.nkbe.npatch.share.LSPConfig { *; }
 
 # JNI registration uses literal bridge class names.

@@ -44,6 +44,10 @@ java -jar jar-v<verName>-<verCode>-release.jar --manager target.apk
 ```
 See the [Usage Guide](https://npatch.nkbe.top/en/guide/usage.html) for detailed CLI arguments and options.
 
+### Custom Permission Isolation
+
+When renaming an app for side-by-side installation, enable **Isolate custom permissions** in Manager or pass `--isolate-permissions` with `--newpackage` in the CLI. The option is off by default. See the [permission probe documentation](patch/src/test/fixtures/permission-probe/README.md) for compatibility details and reproduction steps.
+
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=7723mod/NPatch&type=Date)](https://star-history.com/#7723mod/NPatch&Date)

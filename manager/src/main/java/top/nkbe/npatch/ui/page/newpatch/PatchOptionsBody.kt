@@ -232,6 +232,12 @@ fun PatchOptionsBody(modifier: Modifier, onAddEmbed: () -> Unit) {
                     viewModel.newPackageName,
                     onValueChange = { viewModel.newPackageName = it },
                 )
+                SwitchPreference(
+                    title = stringResource(R.string.patch_isolate_permissions),
+                    summary = stringResource(R.string.patch_isolate_permissions_desc),
+                    checked = viewModel.isolatePermissions,
+                    onCheckedChange = { viewModel.isolatePermissions = it },
+                )
 
                 val maxSigBypassLevel = if (viewModel.useManager) {
                     Constants.SIGBYPASS_SECCOMP

@@ -22,6 +22,7 @@
 -keep class top.nkbe.npatch.Patcher$Options { *; }
 -keep class top.nkbe.npatch.share.LSPConfig { *; }
 -keep class top.nkbe.npatch.share.PatchConfig { *; }
+-keep class top.nkbe.npatch.share.PermissionMapping { *; }
 -keep class org.lsposed.lspd.nativebridge.** { *; }
 -keep class org.lsposed.hiddenapibypass.** { *; }
 -keep class top.nkbe.npatch.loader.SigBypass { *; }

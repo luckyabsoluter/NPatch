@@ -327,6 +327,7 @@ public class LSPApplication {
 
         Startup.initXposed(false, ActivityThread.currentProcessName(), context.getApplicationInfo().dataDir, service);
         Startup.bootstrapXposed(false);
+        PermissionNameMapper.install(context, config.permissionMapping);
 
         // Track appLoadedApk so its modern + legacy package lifecycle is driven
         // exactly once when realizeLoadedApk() builds the class loader below.

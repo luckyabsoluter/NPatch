@@ -45,6 +45,7 @@ class NewPatchViewModel : ViewModel() {
     var useManager by mutableStateOf(true)
         private set
     var newPackageName by mutableStateOf("")
+    var isolatePermissions by mutableStateOf(false)
     var overrideLabel by mutableStateOf("")
     var extractNativeLibs by mutableStateOf(false)
     var debuggable by mutableStateOf(false)
@@ -105,6 +106,7 @@ class NewPatchViewModel : ViewModel() {
         patchState = PatchState.INIT
         useManager = true
         newPackageName = ""
+        isolatePermissions = false
         overrideLabel = ""
         extractNativeLibs = false
         debuggable = false
@@ -200,6 +202,7 @@ class NewPatchViewModel : ViewModel() {
             targetPackageName = patchApp.app.packageName,
             embeddedModulePackages = embeddedModules.map { it.app.packageName },
             injectDex = injectDex,
+            isolatePermissions = isolatePermissions,
             labelOverride = overrideLabel.trim().ifEmpty { null },
             extractNativeLibs = extractNativeLibs
         )

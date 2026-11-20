@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="patch_isolate_permissions">Isolate custom permissions</string>
+    <string name="patch_isolate_permissions_desc">When renaming the app, give its declared permissions unique names. Other apps that use these permissions may lose access.</string>
     <string name="add">Add</string>
     <string name="install">Install</string>
     <string name="installing">Installing</string>

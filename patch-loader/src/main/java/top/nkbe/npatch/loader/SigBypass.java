@@ -172,7 +172,15 @@ public class SigBypass {
         return false;
     }
 
-    private record CallerContext(boolean isModule, boolean isSensitive) {}
+    private static final class CallerContext {
+        final boolean isModule;
+        final boolean isSensitive;
+        
+        CallerContext(boolean isModule, boolean isSensitive) {
+            this.isModule = isModule;
+            this.isSensitive = isSensitive;
+        }
+    }
 
     private static CallerContext checkCallerContext() {
         StackTraceElement[] stack = Thread.currentThread().getStackTrace();

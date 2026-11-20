@@ -32,9 +32,11 @@ include(
     ":meta-loader",
     ":patch",
     ":patch-loader",
+    ":permission-probe",
     ":share:android",
     ":share:java",
 )
+project(":permission-probe").projectDir = file("patch/src/test/fixtures/permission-probe")
 
 includeBuild("core") {
     dependencySubstitution {
