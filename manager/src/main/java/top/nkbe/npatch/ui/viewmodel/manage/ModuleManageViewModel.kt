@@ -29,7 +29,12 @@ class ModuleManageViewModel : ViewModel() {
     private var scopedModulePackages by mutableStateOf<Set<String>>(emptySet())
 
     init {
-        refreshScopedActivationState()
+        viewModelScope.launch {
+            ConfigManager.scopeRestores.collect {
+                scopedModulePackages = withContext(Dispatchers.IO) { loadActivationSnapshot() }
+                activationStateVersion++
+            }
+        }
     }
 
     data class ModuleInfo(

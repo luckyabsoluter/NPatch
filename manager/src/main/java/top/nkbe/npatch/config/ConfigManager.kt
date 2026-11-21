@@ -3,9 +3,13 @@ package top.nkbe.npatch.config
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.room.Room
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import top.nkbe.npatch.database.LSPDatabase
 import top.nkbe.npatch.database.entity.LoadedModule
@@ -39,10 +43,56 @@ object ConfigManager {
     private val loadedModules =
         ConcurrentHashMap<String, org.matrix.vector.ipc.LoadedModule>()
     private val moduleLoadLocks = ConcurrentHashMap<String, Mutex>()
+    private val scopeWrites = Mutex()
+    private val scopeRestoreVersion = MutableStateFlow(0)
+    internal val scopeRestores = scopeRestoreVersion.asStateFlow()
+
+    internal data class ScopedModule(val module: LoadedModule, val apps: List<String>)
+
+    internal suspend fun <T> withScopeWrites(action: suspend () -> T): T =
+        scopeWrites.withLock { action() }
+
+    private suspend fun <T> writeScopes(action: suspend () -> T): T =
+        withContext(writeDispatcher) { withScopeWrites(action) }
+
+    internal suspend fun scopeSnapshot(): List<ScopedModule> = db.withTransaction {
+        val appsByModule = scopeDao.getAll().groupBy({ it.modulePkgName }, { it.appPkgName })
+        moduleDao.getAll().mapNotNull { module ->
+            appsByModule[module.pkgName]?.let { ScopedModule(module, it) }
+        }.sortedBy { it.module.pkgName }
+    }
+
+    internal suspend fun replaceScopes(
+        scopedModules: List<ScopedModule>,
+        previousPaths: Map<String, String?> = emptyMap(),
+    ) {
+        db.withTransaction {
+            scopeDao.clear()
+            for ((packageName, apkPath) in previousPaths) {
+                if (apkPath == null) {
+                    moduleDao.getModule(packageName)?.let { moduleDao.delete(it) }
+                } else {
+                    moduleDao.insert(LoadedModule(packageName, apkPath))
+                    moduleDao.updatePath(packageName, apkPath)
+                }
+            }
+            for ((module, apps) in scopedModules) {
+                moduleDao.insert(module)
+                moduleDao.updatePath(module.pkgName, module.apkPath)
+                apps.forEach { scopeDao.insert(Scope(it, module.pkgName)) }
+            }
+        }
+        previousPaths.keys.forEach(::removeCachedModule)
+        scopedModules.forEach { removeCachedModule(it.module.pkgName) }
+    }
+
+    internal fun notifyScopesRestored() {
+        scopeRestoreVersion.value++
+    }
 
     suspend fun updateModules(newModules: Map<String, String>, isRestrictedScan: Boolean = false) {
         val changedModules =
-            withContext(writeDispatcher) {
+            writeScopes {
                 val changed = linkedSetOf<String>()
                 for (LoadedModule in moduleDao.getAll()) {
                     val apkPath = newModules[LoadedModule.pkgName]
@@ -82,14 +132,14 @@ object ConfigManager {
         }
 
     suspend fun activateModule(pkgName: String, LoadedModule: LoadedModule) =
-        withContext(writeDispatcher) {
+        writeScopes {
             moduleDao.insert(LoadedModule)
             scopeDao.insert(Scope(appPkgName = pkgName, modulePkgName = LoadedModule.pkgName))
             ModuleScopeSyncStore.saveSnapshot(LoadedModule.pkgName, scopeDao.getAppsForModule(LoadedModule.pkgName))
         }
 
     suspend fun deactivateModule(pkgName: String, LoadedModule: LoadedModule) =
-        withContext(writeDispatcher) {
+        writeScopes {
             scopeDao.delete(Scope(appPkgName = pkgName, modulePkgName = LoadedModule.pkgName))
             ModuleScopeSyncStore.saveSnapshot(LoadedModule.pkgName, scopeDao.getAppsForModule(LoadedModule.pkgName))
         }

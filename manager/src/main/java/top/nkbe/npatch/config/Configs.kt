@@ -1,5 +1,7 @@
 package top.nkbe.npatch.config
 
+import android.content.SharedPreferences
+import androidx.compose.runtime.snapshots.Snapshot
 import top.nkbe.npatch.lspApp
 import top.nkbe.npatch.ui.util.delegateStateOf
 import top.nkbe.npatch.ui.util.getValue
@@ -8,14 +10,44 @@ import java.io.File
 
 object Configs {
 
-    private const val PREFS_KEYSTORE_PRESET = "keystore_preset"
-    private const val PREFS_KEYSTORE_PASSWORD = "keystore_password"
-    private const val PREFS_KEYSTORE_ALIAS = "keystore_alias"
-    private const val PREFS_KEYSTORE_ALIAS_PASSWORD = "keystore_alias_password"
-    private const val PREFS_STORAGE_DIRECTORY = "storage_directory"
-    private const val PREFS_DETAIL_PATCH_LOGS = "detail_patch_logs"
-    private const val PREFS_LANGUAGE = "language"
-    private const val PREFS_WEL_SKIP = "WEL_SKIP"
+    internal const val KEYSTORE_PRESET = "keystore_preset"
+    internal const val KEYSTORE_PASSWORD = "keystore_password"
+    internal const val KEYSTORE_ALIAS = "keystore_alias"
+    internal const val KEYSTORE_ALIAS_PASSWORD = "keystore_alias_password"
+    internal const val STORAGE_DIRECTORY = "storage_directory"
+    internal const val LANGUAGE = "language"
+
+    private val backupKeys = linkedMapOf<String, Class<*>>()
+    private val backupReaders = linkedMapOf<String, () -> Any?>()
+    private val reloadActions = mutableListOf<() -> Unit>()
+
+    internal val backupPreferenceTypes: Map<String, Class<*>> get() = backupKeys
+
+    private fun <T> preference(
+        key: String,
+        type: Class<*>,
+        backup: Boolean = true,
+        read: (SharedPreferences) -> T,
+        write: SharedPreferences.Editor.(T) -> Unit,
+    ) = delegateStateOf(read(lspApp.prefs)) {
+        lspApp.prefs.edit().apply { write(it) }.apply()
+    }.also { state ->
+        if (backup) {
+            backupKeys[key] = type
+            backupReaders[key] = { read(lspApp.prefs) }
+            reloadActions += { state.updateFromSource(read(lspApp.prefs)) }
+        }
+    }
+
+    private fun string(key: String, default: String) =
+        preference(key, String::class.java, read = { it.getString(key, default) ?: default }) {
+            putString(key, it)
+        }
+
+    private fun boolean(key: String, default: Boolean, backup: Boolean = true) =
+        preference(key, Boolean::class.javaObjectType, backup, { it.getBoolean(key, default) }) {
+            putBoolean(key, it)
+        }
 
     private fun defaultKeyStorePreset(): KeystorePreset {
         return if (File(lspApp.filesDir, "keystore.bks").exists()) {
@@ -25,66 +57,30 @@ object Configs {
         }
     }
 
-    var keyStorePreset by delegateStateOf(
-        KeystorePreset.fromPrefValue(
-            lspApp.prefs.getString(PREFS_KEYSTORE_PRESET, null),
-            defaultKeyStorePreset()
-        )
-    ) {
-        lspApp.prefs.edit().putString(PREFS_KEYSTORE_PRESET, it.prefValue).apply()
-    }
+    var keyStorePreset by preference(KEYSTORE_PRESET, String::class.java, read = {
+        KeystorePreset.fromPrefValue(it.getString(KEYSTORE_PRESET, null), defaultKeyStorePreset())
+    }) { putString(KEYSTORE_PRESET, it.prefValue) }
 
-    var language by delegateStateOf(lspApp.prefs.getString(PREFS_LANGUAGE, "")!!) {
-        lspApp.prefs.edit().putString(PREFS_LANGUAGE, it).apply()
-    }
+    var language by string(LANGUAGE, "")
+    var keyStorePassword by string(KEYSTORE_PASSWORD, "123456")
+    var keyStoreAlias by string(KEYSTORE_ALIAS, "key0")
+    var keyStoreAliasPassword by string(KEYSTORE_ALIAS_PASSWORD, "123456")
 
-    var keyStorePassword by delegateStateOf(lspApp.prefs.getString(PREFS_KEYSTORE_PASSWORD, "123456")!!) {
-        lspApp.prefs.edit().putString(PREFS_KEYSTORE_PASSWORD, it).apply()
-    }
+    var storageDirectory by preference(STORAGE_DIRECTORY, String::class.java, read = {
+        it.getString(STORAGE_DIRECTORY, null)
+    }) { putString(STORAGE_DIRECTORY, it) }
 
-    var keyStoreAlias by delegateStateOf(lspApp.prefs.getString(PREFS_KEYSTORE_ALIAS, "key0")!!) {
-        lspApp.prefs.edit().putString(PREFS_KEYSTORE_ALIAS, it).apply()
-    }
+    var detailPatchLogs by boolean("detail_patch_logs", true)
+    var welcomeSeen by boolean("WEL_SKIP", false, backup = false)
+    var outputFullLog by boolean("output_full_log", false)
+    var installNotificationEnabled by boolean("install_notification_enabled", false)
+    var installAllUsers by boolean("install_all_users", false)
+    var thirdPartyInstallerPackage by string("third_party_installer_package", "")
+    var keepAlive by boolean("keep_alive", false)
 
-    var keyStoreAliasPassword by delegateStateOf(lspApp.prefs.getString(PREFS_KEYSTORE_ALIAS_PASSWORD, "123456")!!) {
-        lspApp.prefs.edit().putString(PREFS_KEYSTORE_ALIAS_PASSWORD, it).apply()
-    }
+    internal fun backupPreferenceValues(): Map<String, Any?> = backupReaders.mapValues { it.value() }
 
-    var storageDirectory by delegateStateOf(lspApp.prefs.getString(PREFS_STORAGE_DIRECTORY, null)) {
-        lspApp.prefs.edit().putString(PREFS_STORAGE_DIRECTORY, it).apply()
-    }
-
-    var detailPatchLogs by delegateStateOf(lspApp.prefs.getBoolean(PREFS_DETAIL_PATCH_LOGS, true)) {
-        lspApp.prefs.edit().putBoolean(PREFS_DETAIL_PATCH_LOGS, it).apply()
-    }
-
-    var welcomeSeen by delegateStateOf(lspApp.prefs.getBoolean(PREFS_WEL_SKIP, false)) {
-        lspApp.prefs.edit().putBoolean(PREFS_WEL_SKIP, it).apply()
-    }
-
-    private const val PREFS_OUTPUT_FULL_LOG = "output_full_log"
-
-    var outputFullLog by delegateStateOf(lspApp.prefs.getBoolean(PREFS_OUTPUT_FULL_LOG, false)) {
-        lspApp.prefs.edit().putBoolean(PREFS_OUTPUT_FULL_LOG, it).apply()
-    }
-
-    private const val PREFS_INSTALL_NOTIFICATION = "install_notification_enabled"
-    var installNotificationEnabled by delegateStateOf(lspApp.prefs.getBoolean(PREFS_INSTALL_NOTIFICATION, false)) {
-        lspApp.prefs.edit().putBoolean(PREFS_INSTALL_NOTIFICATION, it).apply()
-    }
-
-    private const val PREFS_INSTALL_ALL_USERS = "install_all_users"
-    var installAllUsers by delegateStateOf(lspApp.prefs.getBoolean(PREFS_INSTALL_ALL_USERS, false)) {
-        lspApp.prefs.edit().putBoolean(PREFS_INSTALL_ALL_USERS, it).apply()
-    }
-
-    private const val PREFS_THIRD_PARTY_INSTALLER = "third_party_installer_package"
-    var thirdPartyInstallerPackage by delegateStateOf(lspApp.prefs.getString(PREFS_THIRD_PARTY_INSTALLER, "") ?: "") {
-        lspApp.prefs.edit().putString(PREFS_THIRD_PARTY_INSTALLER, it).apply()
-    }
-
-    private const val PREFS_KEEP_ALIVE = "keep_alive"
-    var keepAlive by delegateStateOf(lspApp.prefs.getBoolean(PREFS_KEEP_ALIVE, false)) {
-        lspApp.prefs.edit().putBoolean(PREFS_KEEP_ALIVE, it).apply()
+    internal fun reloadBackupPreferences() {
+        Snapshot.withMutableSnapshot { reloadActions.forEach { it() } }
     }
 }

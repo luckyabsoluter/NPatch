@@ -14,6 +14,9 @@ object ModuleScopeSyncStore {
     private const val TAG = "ModuleScopeSyncStore"
     private const val DIR_NAME = "module_scope_snapshots"
 
+    internal fun hasSnapshot(modulePackageName: String): Boolean =
+        File(lspApp.filesDir, "$DIR_NAME/$modulePackageName.json").isFile
+
     suspend fun saveSnapshot(modulePackageName: String, appPackageNames: List<String>) =
         withContext(Dispatchers.IO) {
             runCatching {

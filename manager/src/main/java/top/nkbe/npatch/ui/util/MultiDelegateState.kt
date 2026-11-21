@@ -18,6 +18,10 @@ class DelegateState<T>(initial: T, private val sideEffectSetter: (T) -> Unit) {
     operator fun component1(): T = value
 
     operator fun component2(): (T) -> Unit = { value = it }
+
+    fun updateFromSource(value: T) {
+        snapshot = value
+    }
 }
 
 fun <T> delegateStateOf(initial: T, sideEffectSetter: (T) -> Unit) = DelegateState(initial, sideEffectSetter)

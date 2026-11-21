@@ -175,6 +175,16 @@ fun SettingsScreen() {
 
             Spacer(Modifier.height(12.dp))
 
+            SmallTitle(text = stringResource(R.string.settings_backup_category))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = backgroundAwareCardColors(),
+            ) {
+                SettingsBackupPreferences()
+            }
+
+            Spacer(Modifier.height(12.dp))
+
             SmallTitle(text = stringResource(R.string.settings_other_settings))
             Card(
                 modifier = Modifier.fillMaxWidth(),

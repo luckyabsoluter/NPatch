@@ -12,7 +12,8 @@ object BackgroundImageStorage {
     private const val FILE_NAME = "background_image"
 
     suspend fun persistFromUri(context: Context, uri: Uri): String = withContext(Dispatchers.IO) {
-        val targetFile = prepareFile(context)
+        val targetFile = file(context)
+        targetFile.parentFile?.mkdirs()
         context.contentResolver.openInputStream(uri)?.use { input ->
             targetFile.outputStream().use { output ->
                 input.copyTo(output)
@@ -22,17 +23,11 @@ object BackgroundImageStorage {
     }
 
     suspend fun clear(context: Context) = withContext(Dispatchers.IO) {
-        val targetFile = prepareFile(context)
+        val targetFile = file(context)
         if (targetFile.exists()) {
             targetFile.delete()
         }
     }
 
-    private fun prepareFile(context: Context): File {
-        val dir = File(context.filesDir, DIRECTORY_NAME)
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
-        return File(dir, FILE_NAME)
-    }
+    fun file(context: Context): File = context.filesDir.resolve(DIRECTORY_NAME).resolve(FILE_NAME)
 }

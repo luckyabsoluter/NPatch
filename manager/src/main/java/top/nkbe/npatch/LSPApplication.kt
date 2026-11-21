@@ -10,6 +10,7 @@ import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import top.nkbe.npatch.manager.AppBroadcastReceiver
 import top.nkbe.npatch.manager.ManagerLogger
@@ -18,6 +19,7 @@ import top.nkbe.npatch.manager.ModuleScopeSyncStore
 import nkbe.util.NeoPackageManager
 import nkbe.util.ShizukuApi
 import top.nkbe.npatch.config.Configs
+import top.nkbe.npatch.config.SettingsBackup
 import top.nkbe.npatch.service.KeepAliveService
 import java.io.File
 
@@ -62,6 +64,9 @@ class LSPApplication : Application() {
         filesDir.mkdir()
         tmpApkDir = noBackupFilesDir.resolve("apk").also { it.mkdirs() }
         prefs = lspApp.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        if (SettingsBackup.hasRestoreFiles(this)) {
+            runBlocking(Dispatchers.IO) { SettingsBackup.recoverInterruptedRestore(this@LSPApplication) }
+        }
         ManagerLogger.init()
         ShizukuApi.init()
         // Re-arm every companion module's IXposedService binder on every manager process start,

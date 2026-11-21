@@ -28,6 +28,12 @@ interface ScopeDao {
     @Query("SELECT DISTINCT modulePkgName FROM scope")
     suspend fun getScopedModulePackageNames(): List<String>
 
+    @Query("SELECT * FROM scope ORDER BY modulePkgName, appPkgName")
+    suspend fun getAll(): List<Scope>
+
+    @Query("DELETE FROM scope")
+    suspend fun clear()
+
     @Query("DELETE FROM scope WHERE appPkgName = :appPkgName")
     suspend fun deleteForApp(appPkgName: String)
 }

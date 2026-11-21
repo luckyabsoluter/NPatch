@@ -361,4 +361,36 @@
     <string name="settings_keep_alive_summary">Show a persistent notification to keep the manager alive in the background</string>
     <string name="keep_alive_notification_title">NPatch is running</string>
     <string name="keep_alive_notification_text">Providing services for patched apps in background</string>
+
+    <string name="settings_backup_category">Backup and restore</string>
+    <string name="settings_backup_export">Back up settings</string>
+    <string name="settings_backup_import">Restore settings</string>
+    <string name="settings_backup_compression">Compression level</string>
+    <string name="settings_backup_compression_store">No compression</string>
+    <string name="settings_backup_compression_fast">Fast</string>
+    <string name="settings_backup_compression_standard">Standard</string>
+    <string name="settings_backup_compression_maximum">Maximum</string>
+    <string name="settings_backup_protect">Password protection</string>
+    <string name="settings_backup_password">Backup password</string>
+    <string name="settings_backup_confirm_password">Confirm password</string>
+    <string name="settings_backup_password_required">Enter the backup password.</string>
+    <string name="settings_backup_password_mismatch">Enter the same password in both fields.</string>
+    <string name="settings_backup_unprotected">Anyone who can open this ZIP can read any signing key and passwords it contains.</string>
+    <string name="settings_backup_choose_destination">Choose file location</string>
+    <string name="settings_backup_replace">This will replace your current NPatch settings and module scopes.</string>
+    <string name="settings_backup_folder_kept">Your current patch output folder will be used.</string>
+    <string name="settings_backup_folder_reselect">Select a patch output folder again before patching.</string>
+    <string name="settings_backup_working">Working on your settings backup…</string>
+    <string name="settings_backup_saved">Settings backup saved.</string>
+    <string name="settings_backup_restored">Settings restored</string>
+    <string name="settings_backup_write_error">Could not save the settings backup.</string>
+    <string name="settings_backup_read_error">Could not read the settings backup.</string>
+    <string name="settings_backup_apply_error">Could not apply the settings backup.</string>
+    <string name="settings_backup_version_error">This backup format version is not supported.</string>
+    <string name="settings_backup_size_error">The backup exceeds the 64 MiB size limit.</string>
+    <string name="settings_backup_format_error">The backup is invalid, damaged, or protected by a different password.</string>
+    <plurals name="settings_backup_skipped_modules">
+        <item quantity="one">%d unavailable module will be skipped.</item>
+        <item quantity="other">%d unavailable modules will be skipped.</item>
+    </plurals>
 </resources>

@@ -155,6 +155,7 @@ dependencies {
     implementation(npatch.androidx.datastore.preferences)
     implementation(npatch.coil.compose)
     implementation(libs.gson)
+    implementation("net.lingala.zip4j:zip4j:2.11.6")
     implementation(npatch.androidx.lifecycle.viewmodel.compose)
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation(npatch.androidx.room.ktx)
@@ -192,4 +193,5 @@ dependencies {
     debugImplementation(npatch.androidx.customview)
     debugImplementation(npatch.androidx.customview.poolingcontainer)
 
+    testImplementation("junit:junit:4.13.2")
 }
